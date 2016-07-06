@@ -10,7 +10,6 @@ static volatile DSTATUS Stat = STA_NOINIT;
 
 void sd_msp_init(void)
 {
-    SD_HandleTypeDef *hsd = &sd_handle;
 
 	/* Enable SDIO clock */
 	__HAL_RCC_SDIO_CLK_ENABLE();
@@ -18,6 +17,20 @@ void sd_msp_init(void)
 
     GPIO_InitTypeDef GPIO_InitStruct;
 
+    // Detect pin
+    // PC7 -> DETECT
+    GPIO_InitStruct.Pin = GPIO_PIN_7;
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    GPIO_InitStruct.Pull = GPIO_PULLUP;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FAST;
+    GPIO_InitStruct.Alternate = GPIO_AF12_SDIO;
+    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+    // 4 pins for 4-bit
+    // PC8  -> D0
+    // PC9  -> D1
+    // PC10 -> D2
+    // PC11 -> D3
     GPIO_InitStruct.Pin       = GPIO_PIN_8 | GPIO_PIN_9 | GPIO_PIN_10 | GPIO_PIN_11;
     GPIO_InitStruct.Mode      = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull      = GPIO_PULLUP;
@@ -25,7 +38,17 @@ void sd_msp_init(void)
     GPIO_InitStruct.Alternate = GPIO_AF12_SDIO;
     HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
+    // clock
+    // PC12 -> CLK
+    GPIO_InitStruct.Pin       = GPIO_PIN_12;
+    GPIO_InitStruct.Mode      = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull      = GPIO_NOPULL;
+    GPIO_InitStruct.Speed     = GPIO_SPEED_FAST;
+    GPIO_InitStruct.Alternate = GPIO_AF12_SDIO;
+    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
+
+    // PD2 -> CMD
     GPIO_InitStruct.Pin       = GPIO_PIN_2;
     GPIO_InitStruct.Mode      = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull      = GPIO_PULLUP;
@@ -34,7 +57,7 @@ void sd_msp_init(void)
     HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
 	/* NVIC configuration for SDIO interrupts */
-	HAL_NVIC_SetPriority(SDIO_IRQn, 5, 0);
+	HAL_NVIC_SetPriority(SDIO_IRQn, 2, 0);
 	HAL_NVIC_EnableIRQ(SDIO_IRQn);
 }
 
@@ -55,22 +78,28 @@ DSTATUS disk_initialize (BYTE pdrv)
     sd_handle.Init.ClockPowerSave      = SDIO_CLOCK_POWER_SAVE_DISABLE;
     sd_handle.Init.BusWide             = SDIO_BUS_WIDE_1B;
     sd_handle.Init.HardwareFlowControl = SDIO_HARDWARE_FLOW_CONTROL_DISABLE;
-    sd_handle.Init.ClockDiv            = SDIO_TRANSFER_CLK_DIV;
+    sd_handle.Init.ClockDiv            = SDIO_INIT_CLK_DIV;
 
     sd_msp_init();
 
+    DSTATUS ret = SD_OK;
+
     for (int tries = 10; tries > 0; tries--)
     {
-        if (HAL_SD_Init(&sd_handle, &card_info) == SD_OK)
+        if ((ret = HAL_SD_Init(&sd_handle, &card_info)) == SD_OK)
         {
             break;
         }
     }
+    if (ret != SD_OK)
+    {
+      return STA_NOINIT;
+    }
 
     // configure the SD bus width for wide operation
-    if (HAL_SD_WideBusOperation_Config(&sd_handle, SDIO_BUS_WIDE_4B) != SD_OK) {
+    if (HAL_SD_WideBusOperation_Config(&sd_handle, SDIO_BUS_WIDE_1B) != SD_OK) {
         HAL_SD_DeInit(&sd_handle);
-        return -1;
+        return STA_NOINIT;
     }
 
     return 0;
