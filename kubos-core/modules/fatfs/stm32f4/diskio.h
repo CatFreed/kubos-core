@@ -13,7 +13,7 @@ extern "C" {
 #define _USE_IOCTL	1	/* 1: Enable disk_ioctl fucntion */
 
 //#include "../../../CMSIS/Device/ST/STM32F4xx/Include/stm32f4xx.h"
-#include <stm32f407xx.h>
+#include <stm32f4xx.h>
 //#include "stm32f4xx_conf.h"
 #include "kubos-core/modules/fatfs/integer.h"
 // #include "periph/spi.h"

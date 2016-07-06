@@ -78,7 +78,7 @@ DSTATUS disk_initialize (BYTE pdrv)
     sd_handle.Init.ClockPowerSave      = SDIO_CLOCK_POWER_SAVE_DISABLE;
     sd_handle.Init.BusWide             = SDIO_BUS_WIDE_1B;
     sd_handle.Init.HardwareFlowControl = SDIO_HARDWARE_FLOW_CONTROL_DISABLE;
-    sd_handle.Init.ClockDiv            = SDIO_INIT_CLK_DIV;
+    sd_handle.Init.ClockDiv            = SDIO_TRANSFER_CLK_DIV;
 
     sd_msp_init();
 
