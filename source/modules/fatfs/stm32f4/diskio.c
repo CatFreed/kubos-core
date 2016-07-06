@@ -1,0 +1,163 @@
+#include "kubos-core/modules/fatfs/stm32f4/diskio.h"
+#include "stm32cubef4/stm32f4xx_hal.h"
+#include "stm32cubef4/stm32f4xx_hal_sd.h"
+
+static SD_HandleTypeDef sd_handle;
+/* Status of SDCARD */
+static volatile DSTATUS Stat = STA_NOINIT;
+
+#define SD_BLOCK_SIZE 512
+
+void sd_msp_init(void)
+{
+    SD_HandleTypeDef *hsd = &sd_handle;
+
+	/* Enable SDIO clock */
+	__HAL_RCC_SDIO_CLK_ENABLE();
+
+
+    GPIO_InitTypeDef GPIO_InitStruct;
+
+    GPIO_InitStruct.Pin       = GPIO_PIN_8 | GPIO_PIN_9 | GPIO_PIN_10 | GPIO_PIN_11;
+    GPIO_InitStruct.Mode      = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull      = GPIO_PULLUP;
+    GPIO_InitStruct.Speed     = GPIO_SPEED_FAST;
+    GPIO_InitStruct.Alternate = GPIO_AF12_SDIO;
+    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+
+    GPIO_InitStruct.Pin       = GPIO_PIN_2;
+    GPIO_InitStruct.Mode      = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull      = GPIO_PULLUP;
+    GPIO_InitStruct.Speed     = GPIO_SPEED_FAST;
+    GPIO_InitStruct.Alternate = GPIO_AF12_SDIO;
+    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
+	/* NVIC configuration for SDIO interrupts */
+	HAL_NVIC_SetPriority(SDIO_IRQn, 5, 0);
+	HAL_NVIC_EnableIRQ(SDIO_IRQn);
+}
+
+DSTATUS disk_initialize (BYTE pdrv)
+{
+    // check if sd card is present
+
+    // have we already done this?
+    if (sd_handle.Instance != NULL)
+    {
+        return 0;
+    }
+    HAL_SD_CardInfoTypedef card_info;
+
+    sd_handle.Instance = SDIO;
+    sd_handle.Init.ClockEdge           = SDIO_CLOCK_EDGE_RISING;
+    sd_handle.Init.ClockBypass         = SDIO_CLOCK_BYPASS_DISABLE;
+    sd_handle.Init.ClockPowerSave      = SDIO_CLOCK_POWER_SAVE_DISABLE;
+    sd_handle.Init.BusWide             = SDIO_BUS_WIDE_1B;
+    sd_handle.Init.HardwareFlowControl = SDIO_HARDWARE_FLOW_CONTROL_DISABLE;
+    sd_handle.Init.ClockDiv            = SDIO_TRANSFER_CLK_DIV;
+
+    sd_msp_init();
+
+    for (int tries = 10; tries > 0; tries--)
+    {
+        if (HAL_SD_Init(&sd_handle, &card_info) == SD_OK)
+        {
+            break;
+        }
+    }
+
+    // configure the SD bus width for wide operation
+    if (HAL_SD_WideBusOperation_Config(&sd_handle, SDIO_BUS_WIDE_4B) != SD_OK) {
+        HAL_SD_DeInit(&sd_handle);
+        return -1;
+    }
+
+    return 0;
+}
+
+DSTATUS disk_status (BYTE pdrv)
+{
+    Stat = STA_NOINIT;
+    HAL_SD_CardStatusTypedef card_status;
+    if (HAL_SD_GetCardStatus(&sd_handle, &card_status) == SD_OK)
+    {
+        Stat &= ~STA_NOINIT;
+    }
+    else
+    {
+        Stat |= STA_NOINIT;
+    }
+
+    return Stat;
+}
+
+DRESULT disk_read (BYTE pdrv, BYTE*buff, DWORD sector, UINT count)
+{
+    uint64_t block_addr = sector * SD_BLOCK_SIZE;
+    if (HAL_SD_ReadBlocks(&sd_handle, (uint32_t)buff, block_addr, SD_BLOCK_SIZE, count) != SD_OK)
+    {
+        return RES_ERROR;
+    }
+    return RES_OK;
+}
+
+DRESULT disk_write (BYTE pdrv, const BYTE* buff, DWORD sector, UINT count)
+{
+    uint64_t block_addr = sector * SD_BLOCK_SIZE;
+    if (HAL_SD_WriteBlocks(&sd_handle, (uint32_t)buff, block_addr, SD_BLOCK_SIZE, count) != SD_OK)
+    {
+        return RES_ERROR;
+    }
+    return RES_OK;
+}
+
+DRESULT disk_ioctl (BYTE pdrv, BYTE cmd, void* buff)
+{
+    DRESULT res = RES_ERROR;
+	HAL_SD_CardInfoTypedef card_info;
+
+	/* Check if init OK */
+	if (sd_handle.Instance != NULL)
+    {
+    	switch (cmd) {
+    		/* Make sure that no pending write process */
+    		case CTRL_SYNC :
+    			res = RES_OK;
+    			break;
+
+    		/* Size in bytes for single sector */
+    		case GET_SECTOR_SIZE:
+    			*(WORD *)buff = SD_BLOCK_SIZE;
+    			res = RES_OK;
+    			break;
+
+    		/* Get number of sectors on the disk (DWORD) */
+    		case GET_SECTOR_COUNT :
+                HAL_SD_Get_CardInfo(&sd_handle, &card_info);
+    			*(DWORD *)buff = card_info.CardCapacity / SD_BLOCK_SIZE;
+    			res = RES_OK;
+    			break;
+
+    		/* Get erase block size in unit of sector (DWORD) */
+    		case GET_BLOCK_SIZE :
+    			*(DWORD*)buff = SD_BLOCK_SIZE;
+    			break;
+
+    		default:
+    			res = RES_PARERR;
+    	}
+    }
+
+	return res;
+}
+
+DWORD get_fattime (void)
+{
+    return	  ((DWORD)(2013 - 1980) << 25)	/* Year 2013 */
+        | ((DWORD)7 << 21)				/* Month 7 */
+        | ((DWORD)28 << 16)				/* Mday 28 */
+        | ((DWORD)0 << 11)				/* Hour 0 */
+        | ((DWORD)0 << 5)				/* Min 0 */
+        | ((DWORD)0 >> 1);				/* Sec 0 */
+}
