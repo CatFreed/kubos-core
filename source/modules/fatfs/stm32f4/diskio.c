@@ -61,6 +61,7 @@ void sd_msp_init(void)
 	HAL_NVIC_EnableIRQ(SDIO_IRQn);
 }
 
+
 DSTATUS disk_initialize (BYTE pdrv)
 {
     // check if sd card is present
@@ -68,7 +69,7 @@ DSTATUS disk_initialize (BYTE pdrv)
     // have we already done this?
     if (sd_handle.Instance != NULL)
     {
-        return 0;
+        return RES_OK;
     }
     HAL_SD_CardInfoTypedef card_info;
 
@@ -90,6 +91,7 @@ DSTATUS disk_initialize (BYTE pdrv)
         {
             break;
         }
+	// vTaskDelay(50);
     }
     if (ret != SD_OK)
     {
@@ -102,11 +104,15 @@ DSTATUS disk_initialize (BYTE pdrv)
         return STA_NOINIT;
     }
 
-    return 0;
+    return RES_OK;
 }
 
 DSTATUS disk_status (BYTE pdrv)
 {
+	if (sd_handle.Instance == NULL)
+	{
+		return RES_ERROR;
+	}
     Stat = STA_NOINIT;
     HAL_SD_CardStatusTypedef card_status;
     if (HAL_SD_GetCardStatus(&sd_handle, &card_status) == SD_OK)
@@ -123,8 +129,12 @@ DSTATUS disk_status (BYTE pdrv)
 
 DRESULT disk_read (BYTE pdrv, BYTE*buff, DWORD sector, UINT count)
 {
+	if (sd_handle.Instance == NULL)
+	{
+		return RES_ERROR;
+	}
     uint64_t block_addr = sector * SD_BLOCK_SIZE;
-    if (HAL_SD_ReadBlocks(&sd_handle, (uint32_t)buff, block_addr, SD_BLOCK_SIZE, count) != SD_OK)
+    if (HAL_SD_ReadBlocks(&sd_handle, (uint32_t*)buff, block_addr, SD_BLOCK_SIZE, count) != SD_OK)
     {
         return RES_ERROR;
     }
@@ -133,8 +143,12 @@ DRESULT disk_read (BYTE pdrv, BYTE*buff, DWORD sector, UINT count)
 
 DRESULT disk_write (BYTE pdrv, const BYTE* buff, DWORD sector, UINT count)
 {
+	if (sd_handle.Instance == NULL)
+	{
+		return RES_ERROR;
+	}
     uint64_t block_addr = sector * SD_BLOCK_SIZE;
-    if (HAL_SD_WriteBlocks(&sd_handle, (uint32_t)buff, block_addr, SD_BLOCK_SIZE, count) != SD_OK)
+    if (HAL_SD_WriteBlocks(&sd_handle, (uint32_t*)buff, block_addr, SD_BLOCK_SIZE, count) != SD_OK)
     {
         return RES_ERROR;
     }
@@ -190,3 +204,9 @@ DWORD get_fattime (void)
         | ((DWORD)0 << 5)				/* Min 0 */
         | ((DWORD)0 >> 1);				/* Sec 0 */
 }
+
+
+// void SDIO_IRQHandler(void)
+// {
+// 	HAL_SD_IRQHandler(&sd_handle);
+// }
