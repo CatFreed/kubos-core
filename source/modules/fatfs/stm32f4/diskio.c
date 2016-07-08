@@ -99,7 +99,7 @@ DSTATUS disk_initialize (BYTE pdrv)
     }
 
     // configure the SD bus width for wide operation
-    if (HAL_SD_WideBusOperation_Config(&sd_handle, SDIO_BUS_WIDE_1B) != SD_OK) {
+    if (HAL_SD_WideBusOperation_Config(&sd_handle, SDIO_BUS_WIDE_4B) != SD_OK) {
         HAL_SD_DeInit(&sd_handle);
         return STA_NOINIT;
     }
