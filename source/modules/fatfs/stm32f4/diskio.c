@@ -1,6 +1,7 @@
 #include "kubos-core/modules/fatfs/stm32f4/diskio.h"
 #include "stm32cubef4/stm32f4xx_hal.h"
 #include "stm32cubef4/stm32f4xx_hal_sd.h"
+#include "kubos-hal/gpio.h"
 
 static SD_HandleTypeDef sd_handle;
 /* Status of SDCARD */
@@ -10,6 +11,9 @@ static volatile DSTATUS Stat = STA_NOINIT;
 
 void sd_msp_init(void)
 {
+
+	SET_BIT(RCC->AHB1ENR,
+        STM32F4_PIN_AHB1ENR_BIT(PC6) | STM32F4_PIN_AHB1ENR_BIT(PC7));
 
 	/* Enable SDIO clock */
 	__HAL_RCC_SDIO_CLK_ENABLE();
