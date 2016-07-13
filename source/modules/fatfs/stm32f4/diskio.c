@@ -9,66 +9,89 @@ static volatile DSTATUS Stat = STA_NOINIT;
 
 #define SD_BLOCK_SIZE 512
 
-void sd_msp_init(void)
+static void sd_msp_init(void)
 {
+    GPIO_InitTypeDef GPIO_Init_Structure;
+
+	//sd_handle.Instance = NULL;
 
 	SET_BIT(RCC->AHB1ENR,
-        STM32F4_PIN_AHB1ENR_BIT(PC6) | STM32F4_PIN_AHB1ENR_BIT(PC7));
+		STM32F4_PIN_AHB1ENR_BIT(PC6) | STM32F4_PIN_AHB1ENR_BIT(PC7));
 
-	/* Enable SDIO clock */
+    /* Enable SDIO clock */
 	__HAL_RCC_SDIO_CLK_ENABLE();
+	__SDIO_CLK_ENABLE();
 
-
-    GPIO_InitTypeDef GPIO_InitStruct;
-
-    // Detect pin
-    // PC7 -> DETECT
-    GPIO_InitStruct.Pin = GPIO_PIN_7;
-    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-    GPIO_InitStruct.Pull = GPIO_PULLUP;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FAST;
-    GPIO_InitStruct.Alternate = GPIO_AF12_SDIO;
-    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+    __GPIOC_CLK_ENABLE();
+    __GPIOD_CLK_ENABLE();
+    __GPIOA_CLK_ENABLE();
+    __GPIOB_CLK_ENABLE();
 
     // 4 pins for 4-bit
     // PC8  -> D0
     // PC9  -> D1
     // PC10 -> D2
     // PC11 -> D3
-    GPIO_InitStruct.Pin       = GPIO_PIN_8 | GPIO_PIN_9 | GPIO_PIN_10 | GPIO_PIN_11;
-    GPIO_InitStruct.Mode      = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull      = GPIO_PULLUP;
-    GPIO_InitStruct.Speed     = GPIO_SPEED_FAST;
-    GPIO_InitStruct.Alternate = GPIO_AF12_SDIO;
-    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+	// PC12 -> CLK
+    GPIO_Init_Structure.Mode = GPIO_MODE_AF_PP;
+    GPIO_Init_Structure.Pull = GPIO_PULLUP;
+    GPIO_Init_Structure.Speed = GPIO_SPEED_HIGH;
+    GPIO_Init_Structure.Alternate = GPIO_AF12_SDIO;
+    GPIO_Init_Structure.Pin = GPIO_PIN_6 | GPIO_PIN_7 | GPIO_PIN_8 | GPIO_PIN_9 | GPIO_PIN_10 | GPIO_PIN_12;
+    HAL_GPIO_Init(GPIOC, &GPIO_Init_Structure);
 
-    // clock
-    // PC12 -> CLK
-    GPIO_InitStruct.Pin       = GPIO_PIN_12;
-    GPIO_InitStruct.Mode      = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull      = GPIO_NOPULL;
-    GPIO_InitStruct.Speed     = GPIO_SPEED_FAST;
-    GPIO_InitStruct.Alternate = GPIO_AF12_SDIO;
-    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+    GPIO_Init_Structure.Pin = GPIO_PIN_11;
+    GPIO_Init_Structure.Pull = GPIO_NOPULL;
+    HAL_GPIO_Init(GPIOC, &GPIO_Init_Structure);
 
 
     // PD2 -> CMD
-    GPIO_InitStruct.Pin       = GPIO_PIN_2;
-    GPIO_InitStruct.Mode      = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull      = GPIO_PULLUP;
-    GPIO_InitStruct.Speed     = GPIO_SPEED_FAST;
-    GPIO_InitStruct.Alternate = GPIO_AF12_SDIO;
-    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+    GPIO_Init_Structure.Pin = GPIO_PIN_2;
+    GPIO_Init_Structure.Pull = GPIO_PULLUP;
+    HAL_GPIO_Init(GPIOD, &GPIO_Init_Structure);
+
+    // PB8 -> D4
+    // PB9 -> D5
+    GPIO_Init_Structure.Pin = GPIO_PIN_8 | GPIO_PIN_9;
+    HAL_GPIO_Init(GPIOB, &GPIO_Init_Structure);
+
+
+	// Detect pin
+    // PA8 -> DETECT
+    GPIO_Init_Structure.Pin = GPIO_PIN_8;
+    GPIO_Init_Structure.Mode = GPIO_MODE_INPUT;
+    HAL_GPIO_Init(GPIOA, &GPIO_Init_Structure);
+
+
 
 	/* NVIC configuration for SDIO interrupts */
-	HAL_NVIC_SetPriority(SDIO_IRQn, 2, 0);
+	HAL_NVIC_SetPriority(SDIO_IRQn, 5, 0);
 	HAL_NVIC_EnableIRQ(SDIO_IRQn);
 }
 
+void HAL_SD_MspInit(SD_HandleTypeDef * hsd)
+{
+
+}
+
+void HAL_SD_MspDeInit(SD_HandleTypeDef * hsd)
+{
+    HAL_NVIC_DisableIRQ(SDIO_IRQn);
+    __SDIO_CLK_DISABLE();
+}
+
+DSTATUS sd_is_present()
+{
+    return (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_8) == 0);
+}
 
 DSTATUS disk_initialize (BYTE pdrv)
 {
     // check if sd card is present
+    if (!sd_is_present())
+    {
+        return STA_NOINIT;
+    }
 
     // have we already done this?
     if (sd_handle.Instance != NULL)
@@ -76,6 +99,8 @@ DSTATUS disk_initialize (BYTE pdrv)
         return RES_OK;
     }
     HAL_SD_CardInfoTypedef card_info;
+
+    sd_msp_init();
 
     sd_handle.Instance = SDIO;
     sd_handle.Init.ClockEdge           = SDIO_CLOCK_EDGE_RISING;
@@ -85,8 +110,6 @@ DSTATUS disk_initialize (BYTE pdrv)
     sd_handle.Init.HardwareFlowControl = SDIO_HARDWARE_FLOW_CONTROL_DISABLE;
     sd_handle.Init.ClockDiv            = SDIO_TRANSFER_CLK_DIV;
 
-    sd_msp_init();
-
     DSTATUS ret = SD_OK;
 
     for (int tries = 10; tries > 0; tries--)
@@ -95,7 +118,7 @@ DSTATUS disk_initialize (BYTE pdrv)
         {
             break;
         }
-	// vTaskDelay(50);
+		vTaskDelay(50);
     }
     if (ret != SD_OK)
     {
@@ -110,6 +133,8 @@ DSTATUS disk_initialize (BYTE pdrv)
 
     return RES_OK;
 }
+
+
 
 DSTATUS disk_status (BYTE pdrv)
 {
@@ -201,7 +226,7 @@ DRESULT disk_ioctl (BYTE pdrv, BYTE cmd, void* buff)
 
 DWORD get_fattime (void)
 {
-    return	  ((DWORD)(2013 - 1980) << 25)	/* Year 2013 */
+    return	  ((DWORD)(2016 - 1980) << 25)	/* Year 2013 */
         | ((DWORD)7 << 21)				/* Month 7 */
         | ((DWORD)28 << 16)				/* Mday 28 */
         | ((DWORD)0 << 11)				/* Hour 0 */
