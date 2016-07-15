@@ -112,13 +112,13 @@ DSTATUS disk_initialize (BYTE pdrv)
 
     DSTATUS ret = SD_OK;
 
-    for (int tries = 10; tries > 0; tries--)
+    for (int tries = 50; tries > 0; tries--)
     {
         if ((ret = HAL_SD_Init(&sd_handle, &card_info)) == SD_OK)
         {
             break;
         }
-		vTaskDelay(50);
+		vTaskDelay(5);
     }
     if (ret != SD_OK)
     {
