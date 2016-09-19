@@ -62,6 +62,8 @@ From the project folder where you'll be making changes:
 
 	$ git checkout -b {local branch name you create}
 
+You will need to fork each repository where you will be making changes.
+
 ## Make Your Changes
 
 The code.  Write it.  Test it.  
@@ -98,7 +100,7 @@ Commit your changes and push to your remote repository:
 ## Create a Pull Request
 
 Once all of your changes for an issue have been completed, you should create a pull request in order to bring the changes into the main code's
-master branch.
+master branch.  You will need to create a pull request for each repository you are making changes to.
 
 From the github page for your personal repository that contains the changes you want to merge:
 - Click the 'Branch:' dropdown on the left-hand side and select the local branch containing your changes
