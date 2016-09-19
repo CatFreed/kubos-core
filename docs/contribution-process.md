@@ -121,12 +121,14 @@ automatically merged.
 
 In order to resolve the conflict, execute the following steps within your development environment:
 
+Merge the master branch into your local branch
+
 	$ git checkout kubostech/master
 	$ git pull kubostech master
 	$ git checkout {local branch where your changes are}
 	$ git merge kubostech/master
 
-- Git will edit any files with conflicts.  Conflicts will look like this:
+Git will edit any files with conflicts.  Conflicts will look like this:
 	
 		>>>Head
 			New local changes
@@ -134,7 +136,8 @@ In order to resolve the conflict, execute the following steps within your develo
 			New master changes
 		<<<kubostech
 		
-- Edit the files to resolve the conflicts.
+Edit the files to resolve the conflicts.
+Push the resolved changed to your remote repo
 
 	$ git add {fixed files}
 	$ git commit
